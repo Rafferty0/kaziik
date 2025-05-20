@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Parnishka Standofer's casino</title>
+  <style>
+    /* Загальні стилі */
+    body { margin: 0; padding: 0; background: linear-gradient(135deg, #2c3e50, #4ca1af); color: white; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+    .container { text-align: center; background: rgba(0,0,0,0.5); padding: 30px; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); max-width: 450px; width: 100%; position: relative; z-index: 2; }
+    #logo { width: 80px; margin-bottom: 10px; }
+    h1 { margin: 10px 0 20px; font-size: 1.8rem; text-shadow: 2px 2px 5px rgba(0,0,0,0.7); }
+
+    /* Баланс зверху праворуч */
+    .balance { position: absolute; top: 10px; right: 20px; display: flex; align-items: center; font-size: 1.2rem; z-index: 3; }
+    .balance img { width: 30px; margin-right: 5px; }
+
+    /* Слот */
+    .reel-container { display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; }
+    .reel { width: 70px; height: 70px; overflow: hidden; border: 3px solid gold; border-radius: 10px; background: #111; position: relative; box-shadow: inset 0 0 10px rgba(255,215,0,0.5); }
+    .reel-inner { display: flex; flex-direction: column; }
+    .reel-inner span { height: 70px; line-height: 70px; font-size: 40px; text-align: center; }
+
+    /* Ставка */
+    .controls { margin-bottom: 15px; }
+    .controls input { width: 60%; padding: 6px; font-size: 1rem; border-radius: 5px; border: none; text-align: center; }
+
+    /* Кнопки */
+    .buttons { margin-bottom: 15px; }
+    button { padding: 10px 20px; font-size: 1rem; background-color: gold; color: black; border: none; border-radius: 8px; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: block; width: 70%; margin: 5px auto; }
+    button.dep { margin-top: 10px; }
+    button:hover { transform: translateY(-2px); box-shadow: 0 6px 15px rgba(0,0,0,0.4); }
+
+    #result { font-size: 1.2rem; margin-top: 10px; min-height: 1.4em; }
+    #photo, #extraPhoto { margin-top: 15px; width: 160px; border-radius: 12px; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+
+    /* Анімація балансу */
+    @keyframes balanceAnim { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-30px); } }
+    .balance-change { position: absolute; top: 50px; right: 20px; font-size: 1.2rem; animation: balanceAnim 1s forwards; z-index: 4; }
+
+    /* Конфетті тільки по бокам */
+    .confetti { position: absolute; width: 8px; height: 8px; opacity: 0.7; animation: fall 3s linear forwards; }
+    @keyframes fall { to { transform: translate(var(--dx), 600px) rotate(360deg); opacity: 0; } }
+
+    /* Плачучі смайлики */
+    .cry { position: absolute; font-size: 3rem; animation: tear 2s linear forwards; }
+    @keyframes tear { to { transform: translateY(300px); opacity: 0; } }
+
+    /* Блискавка */
+    .flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white; opacity: 0; animation: flashAnim 0.5s forwards; z-index: 5; }
+    @keyframes flashAnim { 0% { opacity: 0; } 50% { opacity: 0.8; } 100% { opacity: 0; } }
+  </style>
+</head>
+<body>
+  <div id="confetti-container"></div>
+  <div id="cry-container"></div>
+  <div class="balance"><img src="coin.png" alt="Coin"><span id="balance">1000000</span></div>
+  <div class="container">
+    <img id="logo" src="logo.svg" alt="Casino Logo">
+    <h1>🎰 Parnishka Standofer's casino 🎰</h1>
+    <div class="controls">
+      <input type="number" id="stake" placeholder="Введи ставку" value="1000">
+    </div>
+    <div class="reel-container">
+      <div class="reel"><div class="reel-inner" id="inner1"></div></div>
+      <div class="reel"><div class="reel-inner" id="inner2"></div></div>
+      <div class="reel"><div class="reel-inner" id="inner3"></div></div>
+    </div>
+    <div class="buttons">
+      <button onclick="startSpin()">Крутити!</button>
+      <button class="dep" onclick="depнуть()">Депнуть</button>
+    </div>
+    <div id="result"></div>
+    <img id="photo" src="" alt="Реакція">
+    <img id="extraPhoto" src="extra.jpg" alt="Твоє фото">
+  </div>
+
+  <script>
+    let balance = 1000000;
+    const symbols = ["🍒","7️⃣","💎","🍋","🔔","⭐","💀","🍉"];
+    
+    function updateBalanceDisplay(change) {
+      document.getElementById('balance').textContent = balance;
+      const changeEl = document.createElement('div');
+      changeEl.className = 'balance-change';
+      changeEl.textContent = (change>0?'+':'') + change;
+      document.body.appendChild(changeEl);
+      changeEl.addEventListener('animationend', ()=>changeEl.remove());
+    }
+
+    function initReels() {
+      [1,2,3].forEach(i => {
+        const inner = document.getElementById(`inner${i}`);
+        inner.innerHTML = '';
+        for(let rep=0; rep<10; rep++) symbols.forEach(sym => {
+          const span = document.createElement('span'); span.textContent = sym; inner.appendChild(span);
+        });
+      });
+    }
+
+    function spawnConfetti() {
+      const container = document.getElementById('confetti-container');
+      for(let i=0;i<100;i++){
+        const c = document.createElement('div');
+        c.className = 'confetti';
+        const side = i%2===0 ? Math.random()*50 : window.innerWidth - 50 + Math.random()*50;
+        c.style.left = side + 'px';
+        c.style.setProperty('--dx', (side<window.innerWidth/2? -50 : 50) + 'px');
+        c.style.background = `hsl(${Math.random()*360},100%,75%)`;
+        container.appendChild(c);
+        c.addEventListener('animationend', ()=>c.remove());
+      }
+    }
+
+    function spawnCry() {
+      const container = document.getElementById('cry-container');
+      for(let i=0;i<10;i++){
+        const e = document.createElement('div'); e.className = 'cry'; e.textContent = '😢';
+        const side = i%2===0 ? 10 : window.innerWidth-60;
+        e.style.left = side + 'px'; e.style.top = Math.random()*100+'px';
+        container.appendChild(e);
+        e.addEventListener('animationend', ()=>e.remove());
+      }
+    }
+
+    function flashScreen() { const f = document.createElement('div'); f.className = 'flash'; document.body.appendChild(f); f.addEventListener('animationend', ()=>f.remove()); }
+
+    function spinReel(id) {
+      return new Promise(resolve=>{
+        const inner = document.getElementById(id);
+        const symbolH = 70;
+        const target = Math.floor(Math.random()*symbols.length);
+        const cycles = 5 + Math.floor(Math.random()*5);
+        const offset = -((cycles*symbols.length)+target)*symbolH;
+        inner.style.transition = `transform ${2+Math.random()}s cubic-bezier(0.33,1,0.68,1)`;
+        inner.style.transform = `translateY(${offset}px)`;
+        inner.addEventListener('transitionend', function h(){ inner.removeEventListener('transitionend', h); resolve(symbols[target]); });
+      });
+    }
+
+    async function startSpin() {
+      const stake = Math.max(0, Number(document.getElementById('stake').value) || 0);
+      document.getElementById('result').textContent = '';
+      document.getElementById('photo').style.display='none'; document.getElementById('extraPhoto').style.display='none';
+      [1,2,3].forEach(i=>{ const inr = document.getElementById(`inner${i}`); inr.style.transition='none'; inr.style.transform='translateY(0)'; });
+      await new Promise(r=>setTimeout(r,50));
+      const [r1,r2,r3] = await Promise.all(['inner1','inner2','inner3'].map(id=>spinReel(id)));
+      let change = 0;
+      if (r1===r2 && r2===r3) {
+        change = stake * 3;
+        balance += change;
+        document.getElementById('result').textContent = '🎉 Три однакові!';
+        spawnConfetti();
+      } else if (r1===r2 || r1===r3 || r2===r3) {
+        change = stake * 2;
+        balance += change;
+        document.getElementById('result').textContent = '✅ Два однакові!';
+        spawnConfetti();
+      } else {
+        change = -stake;
+        balance += change;
+        document.getElementById('result').textContent = '😢 Нічого не співпало';
+        spawnCry();
+      }
+      updateBalanceDisplay(change);
+    }
+
+    function depнуть() {
+      balance -= 9999;
+      updateBalanceDisplay(-9999);
+      flashScreen();
+      document.getElementById('extraPhoto').style.display = 'block';
+    }
+
+    // Ініціалізація
+    window.addEventListener('load', () => { initReels(); updateBalanceDisplay(0); });
+  </script>
+</body>
+</html>
